@@ -16,6 +16,8 @@ import os
 import re
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 from typing import Any
 
 from google.auth.transport.requests import Request
@@ -37,6 +39,7 @@ def _project_root() -> Path:
 
 
 PROJECT_ROOT = _project_root()
+load_dotenv(PROJECT_ROOT / ".env")
 DEFAULT_CLIENT_SECRETS = str(PROJECT_ROOT / "secrets" / "client_secret.json")
 DEFAULT_VIDEO_PATH = str(PROJECT_ROOT / "data" / "reel" / "reel.mp4")
 DEFAULT_RESULTS_JSON = str(PROJECT_ROOT / "data" / "runtime" / "current_product_video_results.json")
@@ -152,10 +155,11 @@ def unique_keep_order(values: list[str]) -> list[str]:
 
 def load_gemini_keys(keys_file: Path) -> list[str]:
     keys: list[str] = []
-    if keys_file.exists():
-        keys.extend(split_key_tokens(keys_file.read_text(encoding="utf-8-sig")))
+    # Prefer env var (set by .env) over file on disk
     keys.extend(split_key_tokens(os.getenv("GEMINI_API_KEYS", "")))
     keys.extend(split_key_tokens(os.getenv("GEMINI_API_KEY", "")))
+    if not keys and keys_file.exists():
+        keys.extend(split_key_tokens(keys_file.read_text(encoding="utf-8-sig")))
     return unique_keep_order(keys)
 
 
@@ -493,7 +497,59 @@ def maybe_generate_dynamic_metadata(
     return title, description
 
 
+def _ensure_client_secrets_from_env(client_secrets: Path) -> Path:
+    """Generate client_secret.json from env vars if the file is missing."""
+    if client_secrets.exists():
+        return client_secrets
+    client_id = os.getenv("YOUTUBE_CLIENT_ID", "")
+    client_secret = os.getenv("YOUTUBE_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        return client_secrets  # let caller handle the missing-file error
+    payload = {
+        "installed": {
+            "client_id": client_id,
+            "project_id": os.getenv("YOUTUBE_PROJECT_ID", ""),
+            "auth_uri": os.getenv("YOUTUBE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": os.getenv("YOUTUBE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": os.getenv("YOUTUBE_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_secret": client_secret,
+            "redirect_uris": [os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost")],
+        }
+    }
+    client_secrets.parent.mkdir(parents=True, exist_ok=True)
+    client_secrets.write_text(json.dumps(payload), encoding="utf-8")
+    print(f"Generated {client_secrets} from .env", file=sys.stderr)
+    return client_secrets
+
+
+def _ensure_token_from_env(token_file: Path) -> Path:
+    """Generate youtube_token.json from env vars if the file is missing."""
+    if token_file.exists():
+        return token_file
+    access_token = os.getenv("YOUTUBE_ACCESS_TOKEN", "")
+    refresh_token = os.getenv("YOUTUBE_REFRESH_TOKEN", "")
+    if not refresh_token:
+        return token_file
+    payload = {
+        "token": access_token,
+        "refresh_token": refresh_token,
+        "token_uri": os.getenv("YOUTUBE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+        "client_id": os.getenv("YOUTUBE_CLIENT_ID", ""),
+        "client_secret": os.getenv("YOUTUBE_CLIENT_SECRET", ""),
+        "scopes": ["https://www.googleapis.com/auth/youtube.upload"],
+        "universe_domain": "googleapis.com",
+        "account": "",
+    }
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    token_file.write_text(json.dumps(payload), encoding="utf-8")
+    print(f"Generated {token_file} from .env", file=sys.stderr)
+    return token_file
+
+
 def get_credentials(client_secrets: Path, token_file: Path) -> Credentials:
+    _ensure_client_secrets_from_env(client_secrets)
+    _ensure_token_from_env(token_file)
+
     creds = None
     if token_file.exists():
         creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)

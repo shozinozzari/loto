@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from dotenv import load_dotenv
+
 
 ASIN_RE = re.compile(r"/(?:dp|gp/product)/([A-Z0-9]{10})", re.IGNORECASE)
 
@@ -233,14 +235,18 @@ class AutoPublisher:
             return self._gemini_keys_cache
 
         keys: list[str] = []
-        api_keys_file = str(self.args.api_keys_file or "").strip()
-        if api_keys_file:
-            key_file_path = Path(api_keys_file).expanduser().resolve()
-            if key_file_path.exists():
-                keys.extend(self._split_key_tokens(key_file_path.read_text(encoding="utf-8-sig")))
-
+        # Prefer env vars (set by .env) first
         keys.extend(self._split_key_tokens(os.getenv("GEMINI_API_KEYS", "")))
         keys.extend(self._split_key_tokens(os.getenv("GEMINI_API_KEY", "")))
+
+        # Fall back to keys file on disk
+        if not keys:
+            api_keys_file = str(self.args.api_keys_file or "").strip()
+            if api_keys_file:
+                key_file_path = Path(api_keys_file).expanduser().resolve()
+                if key_file_path.exists():
+                    keys.extend(self._split_key_tokens(key_file_path.read_text(encoding="utf-8-sig")))
+
         keys = self._unique_keep_order(keys)
         self._gemini_keys_cache = keys
         return keys
@@ -1035,7 +1041,7 @@ class AutoPublisher:
                     self.log(
                         "FATAL: All Gemini API keys appear to be revoked/leaked. "
                         "Generate new keys at https://aistudio.google.com/apikey "
-                        "and update secrets/gemini_keys.txt. Stopping."
+                        "and update .env with new keys. Stopping."
                     )
                     return None
 
@@ -1266,6 +1272,9 @@ def parse_args() -> argparse.Namespace:
         default=2,
         help="Max retries per Gemini key for generating YouTube metadata.",
     )
+    # Load .env from project root
+    load_dotenv(project_root / ".env")
+
     return parser.parse_args()
 
 

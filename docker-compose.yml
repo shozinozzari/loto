@@ -5,11 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: yt-auto
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       TZ: Asia/Kolkata
     volumes:
       - ./data/runtime:/data/runtime
-      - ./secrets:/data/secrets
     command:
       - python
       - scripts/auto_publish_scheduler.py
@@ -21,8 +22,6 @@ services:
       - /data/secrets/client_secret.json
       - --token-file
       - /data/secrets/youtube_token.json
-      - --api-keys-file
-      - /data/secrets/gemini_keys.txt
       - --timezone
       - Asia/Kolkata
       - --schedule-slots

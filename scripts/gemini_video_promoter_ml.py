@@ -28,6 +28,8 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 
 def _project_root() -> Path:
     here = Path(__file__).resolve()
@@ -38,6 +40,7 @@ def _project_root() -> Path:
 
 
 PROJECT_ROOT = _project_root()
+load_dotenv(PROJECT_ROOT / ".env")
 DATA_DIR = PROJECT_ROOT / "data"
 SECRETS_DIR = PROJECT_ROOT / "secrets"
 
@@ -87,8 +90,8 @@ def parse_args() -> argparse.Namespace:
         default="",
         help=(
             "Optional text file with API keys (one per line, or comma-separated). "
-            "If omitted, script tries GEMINI_KEYS_FILE env var, then default "
-            "<project_root>/secrets/gemini_keys.txt."
+            "If omitted, script uses GEMINI_API_KEYS from .env, then GEMINI_KEYS_FILE env var, "
+            "then default <project_root>/secrets/gemini_keys.txt."
         ),
     )
     parser.add_argument(
@@ -334,31 +337,34 @@ def load_api_keys(args: argparse.Namespace) -> list[str]:
     for value in args.api_key or []:
         keys.extend(split_key_tokens(str(value)))
 
-    env_keys_file = os.getenv("GEMINI_KEYS_FILE", "").strip()
-    keys_file_candidates: list[Path] = []
-
-    if str(args.api_keys_file).strip():
-        keys_file_candidates.append(Path(str(args.api_keys_file)).expanduser().resolve())
-    elif env_keys_file:
-        keys_file_candidates.append(Path(env_keys_file).expanduser().resolve())
-    else:
-        keys_file_candidates.append(DEFAULT_KEYS_FILE.expanduser().resolve())
-
-    for keys_file in keys_file_candidates:
-        if not keys_file.exists():
-            if str(args.api_keys_file).strip() or env_keys_file:
-                raise FileNotFoundError(f"API keys file not found: {keys_file}")
-            continue
-        keys.extend(split_key_tokens(keys_file.read_text(encoding="utf-8-sig")))
-
+    # Prefer env vars (set by .env) first
     keys.extend(split_key_tokens(os.getenv("GEMINI_API_KEYS", "")))
     keys.extend(split_key_tokens(os.getenv("GEMINI_API_KEY", "")))
+
+    # Fall back to keys file on disk if env vars yielded nothing
+    if not keys:
+        env_keys_file = os.getenv("GEMINI_KEYS_FILE", "").strip()
+        keys_file_candidates: list[Path] = []
+
+        if str(args.api_keys_file).strip():
+            keys_file_candidates.append(Path(str(args.api_keys_file)).expanduser().resolve())
+        elif env_keys_file:
+            keys_file_candidates.append(Path(env_keys_file).expanduser().resolve())
+        else:
+            keys_file_candidates.append(DEFAULT_KEYS_FILE.expanduser().resolve())
+
+        for keys_file in keys_file_candidates:
+            if not keys_file.exists():
+                if str(args.api_keys_file).strip() or env_keys_file:
+                    raise FileNotFoundError(f"API keys file not found: {keys_file}")
+                continue
+            keys.extend(split_key_tokens(keys_file.read_text(encoding="utf-8-sig")))
 
     keys = unique_keep_order(keys)
     if not keys:
         raise RuntimeError(
-            "Missing API keys. Provide --api-key (repeatable), --api-keys-file, "
-            "GEMINI_KEYS_FILE, GEMINI_API_KEYS, GEMINI_API_KEY, or create "
+            "Missing API keys. Set GEMINI_API_KEYS in .env, provide --api-key (repeatable), "
+            "--api-keys-file, GEMINI_KEYS_FILE, GEMINI_API_KEY, or create "
             f"default file: {DEFAULT_KEYS_FILE}"
         )
     return keys

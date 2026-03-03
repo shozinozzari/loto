@@ -25,7 +25,6 @@ CMD ["python", "scripts/auto_publish_scheduler.py", \
      "--runtime-dir", "/data/runtime", \
      "--client-secrets", "/data/secrets/client_secret.json", \
      "--token-file", "/data/secrets/youtube_token.json", \
-     "--api-keys-file", "/data/secrets/gemini_keys.txt", \
      "--timezone", "Asia/Kolkata", \
      "--schedule-slots", "11:30,17:30,19:30", \
      "--wake-before-minutes", "30", \

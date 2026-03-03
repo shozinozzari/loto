@@ -9,7 +9,6 @@ data/runtime/
 data/reel/
 data/downloaded_videos/
 data/gemini_outputs/
-secrets/client_secret.json
-secrets/youtube_token.json
-secrets/gemini_keys.txt
+secrets/
+.env
 *.vsix
