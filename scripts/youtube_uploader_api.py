@@ -614,10 +614,12 @@ def main():
         sys.exit(1)
 
     client_secrets = Path(args.client_secrets).expanduser().resolve()
+    _ensure_client_secrets_from_env(client_secrets)
     if not client_secrets.exists() or not client_secrets.is_file():
         print(
             f"Missing OAuth client secrets file: {client_secrets}\n"
-            "Create/download it in Google Cloud Console and pass --client-secrets <path>.",
+            "Create/download it in Google Cloud Console, pass --client-secrets <path>,\n"
+            "or set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in .env.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -625,6 +627,7 @@ def main():
     token_file = Path(args.token_file).expanduser().resolve()
     if not token_file.parent.exists():
         os.makedirs(token_file.parent, exist_ok=True)
+    _ensure_token_from_env(token_file)
 
     final_title, final_description = maybe_generate_dynamic_metadata(
         args=args,
