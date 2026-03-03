@@ -1197,8 +1197,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--test-mode",
         action=argparse.BooleanOptionalAction,
-        default=False,
-        # default=True,
+        # default=False,
+        default=True,
         help="Enable immediate test runs (no slot timing or waiting).",
     )
     parser.add_argument(
