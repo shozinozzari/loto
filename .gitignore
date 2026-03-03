@@ -1,0 +1,23 @@
+# Local secrets (API keys, env files)
+*.keys.txt
+.env
+.env.*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets
+secrets/client_secret.json
+secrets/youtube_token.json
+secrets/gemini_keys.txt
+
+# Runtime/generated data
+data/runtime/
+data/downloaded_videos/
+data/gemini_outputs/
+data/reel/
+data/product_video_results.json
+data/product.json
+data/branches.json
